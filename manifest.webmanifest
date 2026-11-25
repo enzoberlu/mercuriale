@@ -1,0 +1,60 @@
+{
+  "id": "./",
+  "name": "Mercuriale — prix d’achat F&L",
+  "short_name": "Mercuriale",
+  "description": "Saisir, comparer et optimiser les prix d’achat fruits et légumes des 4 dépôts.",
+  "lang": "fr",
+  "start_url": "./#/accueil",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#eef3ec",
+  "theme_color": "#1d5a3c",
+  "categories": [
+    "business",
+    "productivity",
+    "food"
+  ],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Saisir un prix",
+      "short_name": "Saisir",
+      "url": "./#/saisir",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Comparer les dépôts",
+      "short_name": "Comparer",
+      "url": "./#/comparer",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}
