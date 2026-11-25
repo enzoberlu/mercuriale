@@ -327,9 +327,9 @@ async function readJ(r) {
 }
 M.api = {
   async ping(url) { const r = await fetchT(url + (url.includes('?') ? '&' : '?') + 'action=ping', {}, 20000); return readJ(r); },
-  async pull(since) {
-    const c = S.cfg; const u = c.apiUrl + (c.apiUrl.includes('?') ? '&' : '?') + 'action=pull&code=' + encodeURIComponent(c.code) + '&since=' + encodeURIComponent(since || '');
-    return readJ(await fetchT(u, {}, 60000));
+  async pull(since, cfg) {
+    const c = cfg || S.cfg; const u = c.apiUrl + (c.apiUrl.includes('?') ? '&' : '?') + 'action=pull&code=' + encodeURIComponent(c.code) + '&since=' + encodeURIComponent(since || '');
+    return readJ(await fetchT(u, {}, since ? 60000 : 150000)); // premier chargement (tout l'historique) : jusqu'à 2 min 30
   },
   async push(ops) {
     const c = S.cfg;
@@ -451,6 +451,7 @@ let syncP = null;
 M.sync = (o) => {
   if (!S.cfg || S.cfg.mode !== 'live') return Promise.resolve();
   if (syncP) { syncP.again = true; return syncP; }
+  const cfg0 = S.cfg;
   syncP = (async () => {
     S.sync.busy = true; M.emit('sync');
     try {
@@ -459,13 +460,15 @@ M.sync = (o) => {
         while (S.queue.length) {
           const batch = S.queue.slice(0, 150);
           const res = await M.api.push(batch.map(({ ts, ...op }) => op));
+          if (S.cfg !== cfg0) return; // déconnexion ou nouvelle connexion pendant l'envoi
           (res.results || []).forEach((r, i) => { if (!r.ok) S.rejected.push({ op: batch[i], error: r.error, at: new Date().toISOString() }); });
           S.queue.splice(0, batch.length);
           await M.saveQueue();
           if ((res.results || []).some(r => !r.ok)) M.emit('rejected');
         }
-        const full = !S.cfg.lastSync;
-        const j = await M.api.pull(M.sinceWithMargin(S.cfg.lastSync));
+        const full = !cfg0.lastSync;
+        const j = await M.api.pull(M.sinceWithMargin(cfg0.lastSync), cfg0);
+        if (S.cfg !== cfg0) return; // la connexion a changé pendant le chargement : on n'applique pas ce résultat
         mergePull(j, full);
         S.cfg.lastSync = j.now; S.cfg.me = j.me; M.saveCfg();
         await M.saveData();
@@ -473,6 +476,7 @@ M.sync = (o) => {
       } while (syncP && syncP.again);
       S.sync.error = null; S.sync.auth = false; S.sync.last = new Date().toISOString();
     } catch (e) {
+      if (S.cfg !== cfg0) return;
       if (e && e.revoked) { await M.wipe('revoked'); return; }
       S.sync.auth = !!(e && e.auth);
       S.sync.error = (e && e.name === 'AbortError') ? 'Le serveur ne répond pas' : (e && e.name === 'TypeError') ? 'Pas de réseau ou serveur injoignable' : (e && e.message) || String(e);
@@ -570,24 +574,37 @@ M.connect = async (apiUrl, code, buyer) => {
   if (!/^https:\/\//.test(apiUrl) && !/^http:\/\/(localhost|127\.0\.0\.1)(:|\/)/.test(apiUrl)) throw new Error('L’adresse du serveur doit commencer par https://');
   const prev = S.cfg;
   if (prev && prev.mode === 'live' && S.queue.length) throw new Error(S.queue.length + ' saisie(s) pas encore envoyée(s) sur cet appareil : synchronise d’abord.');
-  S.adm = null;
-  S.cfg = { mode: 'live', apiUrl, code, buyer: buyer || '', theme: (prev && prev.theme) || 'auto', lastSync: '' };
-  S.data = { prix: [], produits: [], fournisseurs: [], volumes: [], params: M.defaultParams(), acces: [] }; S.queue = []; S.rejected = [];
+  const gen = ++connectGen;
+  const nc = { mode: 'live', apiUrl, code, buyer: buyer || '', theme: (prev && prev.theme) || 'auto', lastSync: '' };
+  // le premier chargement (tout l'historique) peut être long : l'appli ne change rien tant que le serveur n'a pas répondu
+  const j = await M.api.pull('', nc);
+  if (gen !== connectGen) { const e = new Error('Une autre connexion a été lancée entre-temps.'); e.superseded = true; throw e; }
+  const keep = { cfg: S.cfg, data: S.data, queue: S.queue, rejected: S.rejected };
   try {
-    const j = await M.api.pull('');
-    mergePull(j, true); S.cfg.lastSync = j.now; S.cfg.me = j.me;
+    S.adm = null; S.cfg = nc; S.data = { prix: [], produits: [], fournisseurs: [], volumes: [], params: M.defaultParams(), acces: [] }; S.queue = []; S.rejected = [];
+    mergePull(j, true); nc.lastSync = j.now; nc.me = j.me;
     M.saveCfg(); await M.saveData(); await M.saveQueue(); M.reindex();
     return j.me;
-  } catch (e) { S.cfg = prev; M.reindex(); throw e; }
+  } catch (e) { S.cfg = keep.cfg; S.data = keep.data; S.queue = keep.queue; S.rejected = keep.rejected; M.reindex(); throw e; }
 };
+let connectGen = 0;
 /* invitation à usage unique : le serveur donne le code personnel une seule fois, il reste sur ce téléphone */
 M.join = async (apiUrl, jeton, buyer) => {
   apiUrl = String(apiUrl || '').trim();
   if (!/^https:\/\//.test(apiUrl) && !/^http:\/\/(localhost|127\.0\.0\.1)(:|\/)/.test(apiUrl)) throw new Error('Lien d’invitation incomplet');
   if (S.cfg && S.cfg.mode === 'live' && S.queue.length) throw new Error(S.queue.length + ' saisie(s) pas encore envoyée(s) sur cet appareil : synchronise d’abord.');
-  const j = await M.api.call({ action: 'join', jeton: String(jeton || '') }, apiUrl);
-  M.clearInvite();
-  return M.connect(apiUrl, j.code, buyer || (j.me && j.me.nom) || '');
+  // si un essai précédent a déjà utilisé l'invitation mais que le chargement a échoué, on reprend le code reçu
+  const done = M.lsGet('joined', null);
+  let code, nom = '';
+  if (done && done.jeton === String(jeton) && done.api === apiUrl && Date.now() - done.t < 72 * 3600e3) { code = done.code; nom = done.nom || ''; }
+  else {
+    const j = await M.api.call({ action: 'join', jeton: String(jeton || '') }, apiUrl);
+    code = j.code; nom = (j.me && j.me.nom) || '';
+    M.lsSet('joined', { api: apiUrl, jeton: String(jeton), code, nom, t: Date.now() });
+  }
+  const me = await M.connect(apiUrl, code, buyer || nom);
+  M.lsSet('joined', null); M.clearInvite();
+  return me;
 };
 /* invitation en attente : gardée dans l'appareil ET dans un cookie, car sur iPhone l'appli ajoutée à l'écran d'accueil
    ne voit pas le stockage de Safari, mais récupère ses cookies (iOS 17.2 et plus) */

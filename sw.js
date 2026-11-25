@@ -5,7 +5,7 @@
    et l'appli propose de recharger.
    Les appels au serveur Google (script.google.com) ne passent jamais par ce cache.
    IMPORTANT : après toute modification d'un fichier de l'appli, publier aussi ce fichier avec un nouveau numéro. */
-const VERSION = 'merc-1.3.0-8152de522e';
+const VERSION = 'merc-1.3.0-d823f24c7e';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './app.css',
   './demo-data.js', './core.js', './ui.js', './views.js', './main.js',

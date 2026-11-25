@@ -854,12 +854,13 @@
       <p class="small" id="jerr" style="color:var(--bad);margin-bottom:10px" role="alert" hidden></p>
       <button class="btn primary big block" id="jgo" type="button">Rejoindre la base de l’équipe</button>`, { title: 'Bienvenue sur Mercuriale' });
     $('#jgo', s.el).onclick = async () => {
-      const b = $('#jgo', s.el); const err = $('#jerr', s.el); err.hidden = true; b.disabled = true; b.textContent = 'Connexion…';
+      const b = $('#jgo', s.el); const err = $('#jerr', s.el); err.hidden = true; b.disabled = true; b.textContent = 'Chargement de la base…';
+      err.style.color = 'var(--ink-2)'; err.textContent = 'Premier chargement de tout l’historique des prix : jusqu’à une minute. Laisse cette fenêtre ouverte.'; err.hidden = false;
       try {
         const me = await M.join(pre.api, pre.jeton, $('#jname', s.el).value.trim());
         M.lsSet('wiped', null); s.close(); location.hash = '#/accueil'; M.emit('route'); M.persist();
         M.toast('Connecté : ' + (me.role === 'admin' ? 'administrateur' : me.role === 'lecture' ? 'lecture seule' : (M.DEPN[me.depot] || me.depot)));
-      } catch (e) { err.textContent = (e.message || String(e)); err.hidden = false; b.disabled = false; b.textContent = 'Rejoindre la base de l’équipe'; }
+      } catch (e) { if (e && e.superseded) return; err.style.color = 'var(--bad)'; err.textContent = (e.name === 'AbortError' ? 'Le serveur n’a pas répondu à temps, réessaie dans un instant.' : (e.message || String(e))); err.hidden = false; b.disabled = false; b.textContent = 'Rejoindre la base de l’équipe'; }
     };
   };
   /* connexion manuelle : réservée en pratique à l'administrateur (adresse du serveur + code administrateur, visibles seulement dans le Google Sheet) */
@@ -882,12 +883,13 @@
       <button class="btn primary big block" id="cgo" type="button">Se connecter</button>`, { title: 'Rejoindre la base de l’équipe', noFocus: !!pre.code });
     if (pre.code) setTimeout(() => $('#cname', s.el).focus(), 60);
     $('#cgo', s.el).onclick = async () => {
-      const b = $('#cgo', s.el); const err = $('#cerr', s.el); err.hidden = true; b.disabled = true; b.textContent = 'Connexion…';
+      const b = $('#cgo', s.el); const err = $('#cerr', s.el); err.hidden = true; b.disabled = true; b.textContent = 'Chargement de la base…';
+      err.style.color = 'var(--ink-2)'; err.textContent = 'Premier chargement de tout l’historique des prix : jusqu’à une minute. Laisse cette fenêtre ouverte.'; err.hidden = false;
       try {
         const me = await M.connect($('#capi', s.el).value, $('#ccode', s.el).value, $('#cname', s.el).value.trim());
         M.lsSet('wiped', null); s.close(); location.hash = '#/accueil'; M.emit('route'); M.persist();
         M.toast(me.role === 'admin' ? 'Connecté en administrateur (mode administrateur verrouillé)' : 'Connecté : ' + (M.DEPN[me.depot] || me.depot));
-      } catch (e) { err.textContent = 'Connexion impossible : ' + (e.message || e); err.hidden = false; b.disabled = false; b.textContent = 'Se connecter'; }
+      } catch (e) { if (e && e.superseded) return; err.style.color = 'var(--bad)'; err.textContent = 'Connexion impossible : ' + (e.name === 'AbortError' ? 'le serveur n’a pas répondu à temps, réessaie dans un instant.' : (e.message || e)); err.hidden = false; b.disabled = false; b.textContent = 'Se connecter'; }
     };
   };
 })();
