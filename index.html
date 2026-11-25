@@ -12,11 +12,11 @@
   <meta name="apple-mobile-web-app-title" content="Mercuriale">
   <meta name="format-detection" content="telephone=no">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="preload" href="fonts/barlow-condensed-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="fonts/barlow-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="css/app.css">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="preload" href="barlow-condensed-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="barlow-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="app.css">
   <script>try { if (/[?&]demo(=|&|$)/.test(location.search)) localStorage.setItem('merc.testMode', '1'); if (localStorage.getItem('merc.testMode') === '1') window.__mercDemoFile = true; } catch (e) { if (/[?&]demo(=|&|$)/.test(location.search)) window.__mercDemoFile = true; }</script>
   <script>try { var c = JSON.parse(localStorage.getItem('merc.cfg') || 'null'); var t = (c && c.theme) || 'auto'; if (t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.dataset.theme = 'dark'; } catch (e) {}</script>
 </head>
@@ -24,10 +24,10 @@
   <div class="app" id="app"><main id="view"><p style="padding:40px;text-align:center;font-family:system-ui">Chargement de Mercuriale…</p></main></div>
   <div class="toasts" id="toasts" aria-live="polite"></div>
   <noscript><p style="padding:20px">Mercuriale a besoin de JavaScript pour fonctionner.</p></noscript>
-  <script src="js/demo-data.js" defer></script>
-  <script src="js/core.js" defer></script>
-  <script src="js/ui.js" defer></script>
-  <script src="js/views.js" defer></script>
-  <script src="js/main.js" defer></script>
+  <script src="demo-data.js" defer></script>
+  <script src="core.js" defer></script>
+  <script src="ui.js" defer></script>
+  <script src="views.js" defer></script>
+  <script src="main.js" defer></script>
 </body>
 </html>

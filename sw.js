@@ -5,13 +5,13 @@
    et l'appli propose de recharger.
    Les appels au serveur Google (script.google.com) ne passent jamais par ce cache.
    IMPORTANT : après toute modification d'un fichier de l'appli, publier aussi ce fichier avec un nouveau numéro. */
-const VERSION = 'merc-1.3.0-072b06a0bc';
+const VERSION = 'merc-1.3.0-8152de522e';
 const SHELL = [
-  './', './index.html', './manifest.webmanifest', './css/app.css',
-  './js/demo-data.js', './js/core.js', './js/ui.js', './js/views.js', './js/main.js',
-  './fonts/barlow-condensed-latin-500-normal.woff2', './fonts/barlow-condensed-latin-600-normal.woff2', './fonts/barlow-condensed-latin-700-normal.woff2',
-  './fonts/barlow-latin-400-normal.woff2', './fonts/barlow-latin-500-normal.woff2', './fonts/barlow-latin-700-normal.woff2',
-  './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png', './icons/apple-touch-icon.png', './icons/favicon.svg'
+  './', './index.html', './manifest.webmanifest', './app.css',
+  './demo-data.js', './core.js', './ui.js', './views.js', './main.js',
+  './barlow-condensed-latin-500-normal.woff2', './barlow-condensed-latin-600-normal.woff2', './barlow-condensed-latin-700-normal.woff2',
+  './barlow-latin-400-normal.woff2', './barlow-latin-500-normal.woff2', './barlow-latin-700-normal.woff2',
+  './icon-192.png', './icon-512.png', './maskable-512.png', './apple-touch-icon.png', './favicon.svg'
 ];
 self.addEventListener('install', e => {
   // { cache: 'reload' } : on va chercher les fichiers sur le serveur, pas dans le cache du navigateur

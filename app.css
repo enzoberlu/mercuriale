@@ -1,10 +1,10 @@
 /* Mercuriale — prix d'achat F&L des 4 dépôts */
-@font-face { font-family: "Barlow Condensed"; font-weight: 500; font-display: swap; src: url(../fonts/barlow-condensed-latin-500-normal.woff2) format("woff2"); }
-@font-face { font-family: "Barlow Condensed"; font-weight: 600; font-display: swap; src: url(../fonts/barlow-condensed-latin-600-normal.woff2) format("woff2"); }
-@font-face { font-family: "Barlow Condensed"; font-weight: 700; font-display: swap; src: url(../fonts/barlow-condensed-latin-700-normal.woff2) format("woff2"); }
-@font-face { font-family: "Barlow"; font-weight: 400; font-display: swap; src: url(../fonts/barlow-latin-400-normal.woff2) format("woff2"); }
-@font-face { font-family: "Barlow"; font-weight: 500; font-display: swap; src: url(../fonts/barlow-latin-500-normal.woff2) format("woff2"); }
-@font-face { font-family: "Barlow"; font-weight: 700; font-display: swap; src: url(../fonts/barlow-latin-700-normal.woff2) format("woff2"); }
+@font-face { font-family: "Barlow Condensed"; font-weight: 500; font-display: swap; src: url(barlow-condensed-latin-500-normal.woff2) format("woff2"); }
+@font-face { font-family: "Barlow Condensed"; font-weight: 600; font-display: swap; src: url(barlow-condensed-latin-600-normal.woff2) format("woff2"); }
+@font-face { font-family: "Barlow Condensed"; font-weight: 700; font-display: swap; src: url(barlow-condensed-latin-700-normal.woff2) format("woff2"); }
+@font-face { font-family: "Barlow"; font-weight: 400; font-display: swap; src: url(barlow-latin-400-normal.woff2) format("woff2"); }
+@font-face { font-family: "Barlow"; font-weight: 500; font-display: swap; src: url(barlow-latin-500-normal.woff2) format("woff2"); }
+@font-face { font-family: "Barlow"; font-weight: 700; font-display: swap; src: url(barlow-latin-700-normal.woff2) format("woff2"); }
 
 :root {
   --paper: #eef3ec;
