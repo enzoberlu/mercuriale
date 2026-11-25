@@ -678,7 +678,10 @@
   /* ============================================================ RÉGLAGES */
   const ROLE_L = { acheteur: 'Acheteur', lecture: 'Lecture seule', admin: 'Administrateur' };
   const agoT = iso => { if (!iso) return 'jamais connecté'; const m = Math.round((Date.now() - Date.parse(iso)) / 60000); if (!isFinite(m)) return '—'; if (m < 2) return 'vu à l’instant'; if (m < 60) return 'vu il y a ' + m + ' min'; if (m < 48 * 60) return 'vu il y a ' + Math.round(m / 60) + ' h'; return 'vu il y a ' + Math.round(m / 1440) + ' j'; };
-  const ACT_L = { admin_ouverture: 'Mode administrateur ouvert', admin_echec: 'Mot de passe refusé', admin_refuse: 'Tentative refusée', parametre: 'Paramètre modifié', catalogue: 'Catalogue modifié', invitation_creee: 'Invitation créée', invitation_utilisee: 'Invitation utilisée', acces_desactive: 'Accès désactivé', acces_reactive: 'Accès réactivé', mot_de_passe: 'Mot de passe changé', envoi: 'Saisies reçues' };
+  const ACT_L = { prix_cree: 'Prix ajouté', prix_modifie: 'Prix modifié', prix_supprime: 'Prix supprimé', prix_restaure: 'Prix rétabli', produit_cree: 'Produit créé', produit_modifie: 'Produit modifié',
+    fournisseur_cree: 'Fournisseur créé', fournisseur_modifie: 'Fournisseur modifié', parametre: 'Paramètre modifié', catalogue: 'Catalogue modifié', connexion: 'Connexion d’un appareil',
+    admin_ouverture: 'Mode administrateur ouvert', admin_echec: 'Mot de passe refusé', admin_refuse: 'Tentative refusée', invitation_creee: 'Invitation créée', invitation_utilisee: 'Inscription',
+    acces_desactive: 'Accès désactivé', acces_reactive: 'Accès réactivé', mot_de_passe: 'Mot de passe changé', envoi: 'Saisies reçues' };
   const inviteLink = jeton => {
     const base = location.href.split('#')[0].split('?')[0];
     const api = S.cfg.mode === 'live' ? S.cfg.apiUrl : 'https://script.google.com/macros/s/DEMO/exec';
@@ -732,9 +735,9 @@
           : `<p class="muted" style="margin-bottom:14px">Tu utilises les données de démonstration. Pour partager les prix entre les 4 dépôts, rejoins la base de l’équipe avec l’invitation reçue (ou, pour l’administrateur, l’adresse du serveur et le code administrateur).</p><button class="btn primary" id="rconn" type="button">Rejoindre la base de l’équipe</button>`}
       </div></div>
       ${M.isAdmin() ? `<div class="set-group"><h2>Administration</h2>
-        ${editP ? `<div class="panel" style="margin-bottom:12px"><div class="row wrap" style="justify-content:space-between"><div><span class="badge leaf">mode administrateur ouvert</span> <span class="small muted">se reverrouille après ${M.ADMIN_MIN} min sans action (encore ${left} min)</span></div><button class="btn sm" id="alock" type="button">Verrouiller</button></div></div>
-          <div id="adm-box"><div class="panel"><p class="muted">Chargement des accès…</p></div></div>`
-        : `<div class="panel"><p class="muted" style="margin-bottom:12px">Les réglages sensibles sont protégés par le mot de passe administrateur : paramètres de calcul, palettisation, accès des acheteurs (invitations, désactivation) et prix des autres dépôts.</p><button class="btn primary" id="aunl" type="button">${I.edit}Déverrouiller</button></div>`}</div>` : ''}
+        ${editP ? `<div class="panel"><div class="row wrap" style="justify-content:space-between;margin-bottom:12px"><div><span class="badge leaf">mode administrateur ouvert</span> <span class="small muted">se reverrouille après ${M.ADMIN_MIN} min sans action (encore ${left} min)</span></div><button class="btn sm" id="alock" type="button">Verrouiller</button></div>
+            <a class="btn primary" href="#/admin">${I.list}Personnes et activité</a><p class="small muted" style="margin-top:10px">Qui est inscrit, qui a fait quoi : chaque prix ajouté, modifié ou supprimé, chaque changement du catalogue, des paramètres et des accès.</p></div>`
+        : `<div class="panel"><p class="muted" style="margin-bottom:12px">Les réglages sensibles sont protégés par le mot de passe administrateur : paramètres de calcul, palettisation, accès des acheteurs (invitations, désactivation), historique de toutes les actions et prix des autres dépôts.</p><button class="btn primary" id="aunl" type="button">${I.edit}Déverrouiller</button></div>`}</div>` : ''}
       <div class="set-group" ${window.__mercDemoFile ? 'hidden' : ''}><h2>Installer sur le téléphone</h2><div class="panel">
         ${window.__mercInstall ? `<button class="btn primary" id="rinst" type="button">${I.download}Installer Mercuriale</button>` : ''}
         <p class="muted" ${window.__mercInstall ? 'style="margin-top:12px"' : ''}>${ios ? 'Sur iPhone : ouvre ce lien dans Safari, touche le bouton Partager puis « Sur l’écran d’accueil ».' : 'Sur Android : menu ⋮ de Chrome puis « Installer l’application » ou « Ajouter à l’écran d’accueil ». Sur ordinateur : icône d’installation dans la barre d’adresse de Chrome ou Edge.'}</p>
@@ -769,49 +772,111 @@
       const d = M.defaultParams(); try { for (const k of Object.keys(d)) { if (S.data.params[k] !== d[k]) await M.setParam(k, d[k]); } M.toast('Valeurs rétablies'); } catch (e) { M.toast('Interrompu : ' + e.message, 'bad'); } V.reglages(root); };
     $('#rcat', root).onclick = () => { const cols = ['id', 'nom', 'famille', 'categorie', 'unite', 'poids_colis', 'pieces_colis', 'colis_palette', 'kg_palette']; M.download('mercuriale_catalogue.csv', M.csv(Array.from(S.ix.prod.values()), cols)); };
     $('#rreset', root).onclick = async () => { if (await M.confirm('Effacer les données de cet appareil ?', live && S.queue.length ? `${S.queue.length} saisie(s) non envoyée(s) seront perdues. Les données déjà envoyées restent dans la base. Pour revenir, il faudra une nouvelle invitation.` : 'Les données déjà envoyées restent dans la base de l’équipe.', 'Effacer', true)) { M.adminLock(); await M.reset(); location.hash = '#/bienvenue'; } };
-    if (editP) adminPanel($('#adm-box', root), root);
   };
 
-  /* accès des acheteurs et journal (mode administrateur ouvert) */
-  async function adminPanel(box, root) {
-    let j;
-    try { j = await M.adminOp('list'); }
-    catch (e) { if (e.session) { M.toast('Session administrateur terminée', 'bad'); V.reglages(root); return; } box.innerHTML = `<div class="panel"><p class="muted">Impossible de charger les accès : ${esc(e.message)}</p></div>`; return; }
+  /* ============================================================ ADMINISTRATION : PERSONNES ET ACTIVITÉ */
+  const ACT_K = a => /^prix_/.test(a) ? 'prix' : /^(produit_|fournisseur_|parametre|catalogue)/.test(a) ? 'catalogue' : 'acces';
+  const ACT_B = { prix: 'Prix', catalogue: 'Catalogue', acces: 'Accès' };
+  M.ui.adm = M.ui.adm || { tab: 'people', person: '', kind: '' };
+  const fmtT = iso => { const d = new Date(iso); return isFinite(d) ? d.toLocaleString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'; };
+  const fmtD = iso => { const d = new Date(iso); return iso && isFinite(d) ? d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'; };
+  V.admin = (root, q) => {
+    if (!M.isAdmin()) { location.replace('#/reglages'); return; }
+    if (!M.adminOn()) {
+      root.innerHTML = `<div class="page-head"><div><h1>Personnes et activité</h1></div></div><div class="panel"><div class="empty"><h2 class="h3">Mode administrateur verrouillé</h2><p>Cette page demande le mot de passe administrateur.</p><button class="btn primary" type="button" id="aunl2">${I.edit}Déverrouiller</button></div></div>`;
+      $('#aunl2', root).onclick = () => M.unlockSheet(() => V.admin(root, q)); return;
+    }
+    M.adminTouch();
+    const U = M.ui.adm; if (q && q.person !== undefined) { U.person = q.person; U.tab = 'act'; }
+    root.innerHTML = `<div class="page-head"><div><h1>Personnes et activité</h1><p class="sub">Réservé à l’administrateur. Tout est enregistré par le serveur : une appli modifiée ne peut pas effacer ses traces.</p></div>
+        <a class="btn" href="#/reglages">Réglages</a></div>
+      ${segH('atab', [['people', 'Personnes inscrites'], ['act', 'Activité']], U.tab)}
+      <div id="abox" style="margin-top:14px"><div class="panel"><p class="muted">Chargement…</p></div></div>`;
+    bindSeg(root, 'atab', v => { U.tab = v; saveUi(); V.admin(root); });
+    const box = $('#abox', root);
+    (U.tab === 'act' ? activityTab : peopleTab)(box, root);
+  };
+  async function peopleTab(box, root) {
+    let j; try { j = await M.adminOp('list'); } catch (e) { return adminFail(e, box, root); }
     if (!box.isConnected) return;
     const rank = p => (p.moi ? 0 : 1) * 1000 + (p.actif ? 0 : 500) + ({ admin: 0, acheteur: 100, lecture: 200 }[p.role] || 300) + (M.DEPS.indexOf(p.depot) + 1);
     const people = j.people.slice().sort((a, b) => rank(a) - rank(b) || a.nom.localeCompare(b.nom, 'fr'));
-    box.innerHTML = `<h3 class="muted" style="margin:14px 2px 8px">Accès personnels</h3>
-      <div class="panel flush">${people.map(p => `<div class="li"><div class="main"><div class="t">${esc(p.nom)}${p.moi ? ' <span class="faint small">(toi)</span>' : ''}</div>
-          <div class="s" style="white-space:normal">${esc(ROLE_L[p.role] || p.role)}${p.depot ? ', ' + esc(p.depot) : ''}, ${esc(agoT(p.dernier_acces))}${p.invitation ? ', invitation valable jusqu’au ' + esc(new Date(p.invitation).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })) : ''}</div>
-          ${p.actif ? '' : '<div><span class="badge bad">désactivé</span></div>'}</div>
+    M.ui.admPeople = people;
+    const actifs = people.filter(p => p.actif).length;
+    box.innerHTML = `<div class="row wrap" style="justify-content:space-between;margin-bottom:10px"><p class="small muted" style="margin:0">${people.length} accès, dont ${actifs} actif(s). Touche une personne pour voir tout ce qu’elle a fait.</p>
+        <div class="row" style="gap:8px"><button class="btn sm" type="button" id="pcsv">${I.download}Exporter</button><button class="btn primary sm" type="button" id="ainv">${I.plus}Inviter quelqu’un</button></div></div>
+      <div class="panel flush">${people.map(p => `<div class="li"><a class="main" href="#/admin?person=${encodeURIComponent(p.id)}" style="color:inherit;text-decoration:none">
+          <div class="t">${esc(p.nom)}${p.moi ? ' <span class="faint small">(toi)</span>' : ''} ${p.actif ? '' : '<span class="badge bad">désactivé</span>'}</div>
+          <div class="s" style="white-space:normal">${esc(ROLE_L[p.role] || p.role)}${p.depot ? ', ' + esc(p.depot) : ''}, ${esc(agoT(p.dernier_acces))}</div>
+          <div class="s" style="white-space:normal">${p.inscrit_le ? 'Inscrit le ' + esc(fmtD(p.inscrit_le)) : p.invitation ? 'Invitation en attente jusqu’au ' + esc(fmtD(p.invitation)) : p.dernier_acces ? 'Connecté avec son code, sans invitation' : 'Pas encore inscrit'}${p.cree_par ? ', invité par ' + esc(p.cree_par) : ''}, ${p.appareils || 0} appareil(s), ${p.actions30 || 0} action(s) sur 30 jours</div></a>
           <div class="row" style="gap:6px">${p.actif ? `<button class="btn sm" type="button" data-reinv="${esc(p.id)}" aria-label="Nouveau lien pour ${esc(p.nom)}">${I.share}<span class="hs">Nouveau lien</span></button>` : ''}
           ${p.moi ? '' : `<button class="btn sm ${p.actif ? 'danger' : ''}" type="button" data-tog="${esc(p.id)}">${p.actif ? 'Désactiver' : 'Réactiver'}</button>`}</div></div>`).join('')}</div>
-      <div class="row wrap" style="margin-top:10px"><button class="btn primary" type="button" id="ainv">${I.plus}Inviter quelqu’un</button></div>
-      <p class="small muted" style="margin-top:8px">Une invitation ne marche qu’une fois, pendant 72 h, sur le téléphone qui l’ouvre. « Nouveau lien » sert pour un nouveau téléphone. « Désactiver » coupe l’accès et efface les données de son appli au prochain contact.</p>
-      <h3 class="muted" style="margin:18px 2px 8px">Journal des actions sensibles</h3>
-      <div class="panel flush">${(j.journal || []).filter(x => x.action !== 'envoi').slice(0, 15).map(x => `<div class="li"><div class="main"><div class="t">${esc(ACT_L[x.action] || x.action)}</div><div class="s" style="white-space:normal">${esc(new Date(x.t).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))}, ${esc(x.role)}${x.detail ? ', ' + esc(x.detail) : ''}</div></div></div>`).join('') || '<div class="empty"><p>Rien pour l’instant.</p></div>'}</div>`;
+      <p class="small muted" style="margin-top:8px">Une invitation ne marche qu’une fois, pendant 72 h, sur le téléphone qui l’ouvre. « Nouveau lien » sert pour un nouveau téléphone. « Désactiver » coupe l’accès et efface les données de son appli au prochain contact.</p>`;
+    $('#pcsv', box).onclick = () => {
+      const cols = ['nom', 'role_l', 'depot', 'etat', 'inscrit', 'cree_par', 'dernier', 'appareils', 'actions30'];
+      const out = people.map(p => ({ nom: p.nom, role_l: ROLE_L[p.role] || p.role, depot: p.depot, etat: p.actif ? 'actif' : 'désactivé', inscrit: p.inscrit_le ? fmtD(p.inscrit_le) : '', cree_par: p.cree_par, dernier: p.dernier_acces ? new Date(p.dernier_acces).toLocaleString('fr-FR') : '', appareils: p.appareils || 0, actions30: p.actions30 || 0 }));
+      M.download('mercuriale_personnes_' + M.today() + '.csv', M.csv(out, cols, ['Nom', 'Rôle', 'Dépôt', 'État', 'Inscrit le', 'Invité par', 'Dernier accès', 'Appareils', 'Actions sur 30 jours']));
+    };
     $$('[data-reinv]', box).forEach(b => b.onclick = async () => { const p = people.find(x => x.id === b.dataset.reinv);
       if (!(await M.confirm('Nouveau lien pour ' + p.nom + ' ?', 'Pour un nouveau téléphone. L’ancien téléphone garde son accès : désactive-le si l’appareil est perdu.', 'Créer le lien'))) return;
-      try { const r = await M.adminOp('reinvite', { id: p.id }); shareInvite(p.nom, r); adminPanel(box, root); } catch (e) { M.toast(e.message, 'bad'); } });
+      try { const r = await M.adminOp('reinvite', { id: p.id }); shareInvite(p.nom, r); peopleTab(box, root); } catch (e) { adminFail(e, box, root, true); } });
     $$('[data-tog]', box).forEach(b => b.onclick = async () => { const p = people.find(x => x.id === b.dataset.tog);
       if (p.actif && !(await M.confirm('Désactiver ' + p.nom + ' ?', 'Son application ne pourra plus rien lire ni envoyer, et ses données seront effacées de son téléphone au prochain contact avec le serveur.', 'Désactiver', true))) return;
-      try { await M.adminOp(p.actif ? 'revoke' : 'restore', { id: p.id }); M.toast(p.actif ? p.nom + ' désactivé' : p.nom + ' réactivé'); adminPanel(box, root); } catch (e) { M.toast(e.message, 'bad'); } });
+      try { await M.adminOp(p.actif ? 'revoke' : 'restore', { id: p.id }); M.toast(p.actif ? p.nom + ' désactivé' : p.nom + ' réactivé'); peopleTab(box, root); } catch (e) { adminFail(e, box, root, true); } });
     $('#ainv', box).onclick = () => {
       let role = 'acheteur', dep = '';
       const s = M.sheet(`<div class="field"><label for="iv-n">Prénom (ou nom)</label><input class="input" id="iv-n" placeholder="ex. Léa" maxlength="60"></div>
         <div class="field"><span class="lbl">Rôle</span>${segH('ivr', [['acheteur', 'Acheteur'], ['lecture', 'Lecture seule'], ['admin', 'Administrateur']], role)}<span class="hint" id="iv-h">Saisit et consulte les prix de son dépôt.</span></div>
-        <div class="field" id="iv-df"><span class="lbl">Dépôt</span>${segH('ivd', M.DEPS.map(d => [d, d]), dep)}</div>
+        <div class="field" id="iv-df"><span class="lbl">Dépôt <span class="faint small" id="iv-dh">(obligatoire)</span></span>${segH('ivd', M.DEPS.map(d => [d, d]), dep)}</div>
         <p class="small" id="iv-e" style="color:var(--bad);margin:0 0 10px" role="alert" hidden></p>
         <button class="btn primary big block" type="button" id="iv-go">Créer l’invitation</button>`, { title: 'Inviter quelqu’un' });
-      const hint = { acheteur: 'Saisit et consulte les prix de son dépôt.', lecture: 'Consulte tout, ne saisit rien (direction, comptabilité).', admin: 'Comme toi : réglages sensibles avec le mot de passe administrateur.' };
-      bindSeg(s.el, 'ivr', v => { role = v; $('#iv-h', s.el).textContent = hint[v]; });
+      const hint = { acheteur: 'Saisit et consulte les prix de son dépôt.', lecture: 'Consulte tout, ne saisit rien (direction, comptabilité).', admin: 'Réglages sensibles avec le mot de passe administrateur. Avec un dépôt, il peut aussi saisir des prix sans déverrouiller.' };
+      bindSeg(s.el, 'ivr', v => { role = v; $('#iv-h', s.el).textContent = hint[v]; $('#iv-dh', s.el).textContent = v === 'acheteur' ? '(obligatoire)' : '(facultatif)'; });
       bindSeg(s.el, 'ivd', v => { dep = v; });
       $('#iv-go', s.el).onclick = async () => {
         const nom = $('#iv-n', s.el).value.trim(); const er = $('#iv-e', s.el); er.hidden = true;
-        try { const r = await M.adminOp('invite', { nom, role, depot: dep }); s.close(); shareInvite(nom, r); adminPanel(box, root); }
-        catch (e) { er.textContent = e.message; er.hidden = false; if (e.session) { s.close(); V.reglages(root); } }
+        try { const r = await M.adminOp('invite', { nom, role, depot: dep }); s.close(); shareInvite(nom, r); peopleTab(box, root); }
+        catch (e) { er.textContent = e.message; er.hidden = false; if (e.session) { s.close(); V.admin(root); } }
       };
     };
+  }
+  async function activityTab(box, root) {
+    const U = M.ui.adm; let people = M.ui.admPeople;
+    if (!people) { try { people = (await M.adminOp('list')).people; M.ui.admPeople = people; } catch (e) { return adminFail(e, box, root); } }
+    let rows = [], total = 0;
+    const load = async (more) => {
+      let j; try { j = await M.adminOp('activity', { person: U.person, kind: U.kind, offset: more ? rows.length : 0, limit: 150 }); } catch (e) { return adminFail(e, box, root); }
+      rows = more ? rows.concat(j.rows) : j.rows; total = j.total; draw();
+    };
+    const draw = () => {
+      if (!box.isConnected) return;
+      let last = '';
+      box.innerHTML = `<div class="row wrap" style="gap:10px;margin-bottom:10px">
+          <select class="input" id="aper" style="width:auto;min-height:44px" aria-label="Personne"><option value="">Tout le monde</option>${people.map(p => `<option value="${esc(p.id)}"${U.person === p.id ? ' selected' : ''}>${esc(p.nom)}${p.depot ? ' (' + esc(p.depot) + ')' : ''}${p.actif ? '' : ', désactivé'}</option>`).join('')}</select>
+          ${segH('akind', [['', 'Tout'], ['prix', 'Prix'], ['catalogue', 'Catalogue'], ['acces', 'Accès et sécurité']], U.kind)}
+          <button class="btn sm" type="button" id="acsv">${I.download}Exporter</button></div>
+        <p class="small muted" style="margin:0 2px 10px">${total} action(s)${U.person ? ' pour cette personne' : ''}, les plus récentes d’abord. L’historique complet est aussi dans l’onglet Journal du Google Sheet.</p>
+        ${rows.length ? `<div class="panel flush">${rows.map(x => { const day = String(x.t).slice(0, 10); const head = day !== last ? `<div class="li" style="background:var(--surface-2)"><div class="main"><div class="s"><b>${esc(new Date(x.t).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }))}</b></div></div></div>` : ''; last = day; const k = ACT_K(x.action);
+            return head + `<div class="li"><div class="main"><div class="t">${esc(ACT_L[x.action] || x.action)}${x.objet ? ' : ' + esc(x.objet) : ''}</div>
+              <div class="s" style="white-space:normal">${esc(new Date(x.t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }))}, ${esc(x.nom || x.role || '—')}${x.depot ? ' (' + esc(x.depot) + ')' : ''}</div>
+              ${x.detail ? `<div class="s" style="white-space:normal;color:var(--ink)">${esc(x.detail)}</div>` : ''}</div><span class="badge ${k === 'acces' && /echec|refuse|desactive/.test(x.action) ? 'bad' : ''}">${ACT_B[k]}</span></div>`; }).join('')}</div>
+          ${rows.length < total ? `<div style="text-align:center;margin-top:14px"><button class="btn" id="amore" type="button">Afficher plus</button></div>` : ''}`
+        : `<div class="panel"><div class="empty"><h2 class="h3">Aucune action</h2><p>Rien ne correspond à ces filtres pour l’instant.</p></div></div>`}`;
+      $('#aper', box).onchange = e => { U.person = e.target.value; saveUi(); load(false); };
+      bindSeg(box, 'akind', v => { U.kind = v; saveUi(); load(false); });
+      const m = $('#amore', box); if (m) m.onclick = () => load(true);
+      $('#acsv', box).onclick = async () => {
+        let all; try { all = (await M.adminOp('activity', { person: U.person, kind: U.kind, offset: 0, limit: 5000 })).rows; } catch (e) { return adminFail(e, box, root); }
+        const out = all.map(x => ({ quand: new Date(x.t).toLocaleString('fr-FR'), qui: x.nom || x.role, depot: x.depot, quoi: ACT_L[x.action] || x.action, objet: x.objet, detail: x.detail }));
+        M.download('mercuriale_activite_' + M.today() + '.csv', M.csv(out, ['quand', 'qui', 'depot', 'quoi', 'objet', 'detail'], ['Date et heure', 'Qui', 'Dépôt', 'Action', 'Sur quoi', 'Détail (avant → après)'])); M.toast(all.length + ' action(s) exportée(s)');
+      };
+    };
+    load(false);
+  }
+  function adminFail(e, box, root, toastOnly) {
+    if (e && e.session) { M.toast('Mode administrateur verrouillé', 'bad'); V.admin(root); return; }
+    if (toastOnly) { M.toast(e.message || String(e), 'bad'); return; }
+    box.innerHTML = `<div class="panel"><p class="muted">Impossible de charger : ${esc(e.message || String(e))}</p></div>`;
   }
 
   /* ============================================================ BIENVENUE / CONNEXION */
@@ -819,6 +884,7 @@
     const wiped = M.lsGet('wiped', null);
     root.innerHTML = `<div class="welcome">${M.mark('mark')}
       <div><h1>Mercuriale</h1><p class="lead" style="margin-top:10px">Les prix d’achat fruits et légumes des quatre dépôts, au même endroit : saisis-les en quelques secondes, compare, et vois où acheter moins cher, transport compris.</p></div>
+      ${M.isIOS() && M.isStandalone() && !M.pendingInvite() ? `<div class="callout">Sur iPhone, l’appli installée ne voit pas une connexion faite dans Safari. Touche « Rejoindre la base de mon équipe » et colle ton lien d’invitation (appui long sur le lien dans ton message, puis Copier).</div>` : ''}
       ${wiped === 'revoked' ? `<div class="callout bad">Cet appareil a été déconnecté par l’administrateur et ses données ont été effacées. Pour revenir, demande une nouvelle invitation.</div>` : ''}
       <div class="choice">
         ${window.__mercDemoFile ? '' : `<button type="button" id="wjoin"><b>Rejoindre la base de mon équipe</b><span>Ouvre le lien d’invitation reçu de l’administrateur. Administrateur : adresse du serveur et code administrateur.</span></button>`}

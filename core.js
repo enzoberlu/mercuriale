@@ -3,7 +3,7 @@
 const M = window.M = {};
 
 /* ------------------------------------------------------------ constantes */
-M.VERSION = '1.3.0';
+M.VERSION = '1.4.0';
 M.DEPS = ['HBA', 'HBO', 'RV', 'DYN'];                // ordre des lignes de navette (outil existant)
 M.DEPN = { HBA: 'HBA', HBO: 'HBO', RV: 'Relais Vert', DYN: 'DYNAMIS' };
 M.DEPCITY = { HBA: 'Saint-Médard-d’Eyrans (33)', HBO: 'Vendargues (34)', RV: 'Carpentras (84)', DYN: 'Rungis (94)' };
@@ -348,13 +348,37 @@ const demoAdmin = () => S.demoAdm || (S.demoAdm = {
     { id: 'd5', nom: 'Hugo', depot: 'DYN', role: 'acheteur', actif: true, dernier_acces: '', fin: 'P4', appareils: 0, invitation: new Date(Date.now() + 48 * 3600e3).toISOString() },
     { id: 'd6', nom: 'Direction', depot: '', role: 'lecture', actif: true, dernier_acces: new Date(Date.now() - 3 * 86400e3).toISOString(), fin: 'H3', appareils: 1 }
   ],
-  journal: [{ t: new Date(Date.now() - 600e3).toISOString(), role: 'admin (Toi)', depot: '', action: 'parametre', detail: 'diesel : 1.92 → 1.95' }]
+  journal: null
 });
+/* historique de démonstration : fabriqué à partir des prix fictifs, avec quelques modifications et actions d'accès */
+function demoJournal() {
+  const D = demoAdmin(); if (D.journal) return D.journal;
+  const byDep = {}; D.people.forEach(p => { if (p.depot && p.role === 'acheteur') byDep[p.depot] = p; });
+  const recent = S.data.prix.filter(r => !Number(r.supprime) && r.date >= M.addDays(M.today(), -12)).sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 70);
+  const obj = r => [r.produit, r.depot, M.px(M.num(r.prix)) + '/' + (r.unite === 'piece' ? 'pièce' : r.unite), r.fournisseur, r.type === 'offre' ? 'proposition' : ''].filter(Boolean).join(', ');
+  const J = []; let k = 0;
+  recent.forEach(r => {
+    const p = byDep[r.depot] || D.people[0]; const t = new Date(Date.parse(r.date + 'T07:00:00') + (k++ % 9) * 1800e3).toISOString();
+    J.push({ t, acces_id: p.id, nom: p.nom, role: p.role, depot: p.depot, action: 'prix_cree', objet: obj(r), detail: '' });
+    if (k % 11 === 0) J.push({ t: new Date(Date.parse(t) + 900e3).toISOString(), acces_id: p.id, nom: p.nom, role: p.role, depot: p.depot, action: 'prix_modifie', objet: obj(r), detail: 'prix : ' + String(Math.round(M.num(r.prix) * 1.08 * 100) / 100).replace('.', ',') + ' → ' + String(M.num(r.prix)).replace('.', ',') });
+    if (k % 23 === 0) J.push({ t: new Date(Date.parse(t) + 1200e3).toISOString(), acces_id: p.id, nom: p.nom, role: p.role, depot: p.depot, action: 'prix_supprime', objet: obj(r), detail: '' });
+  });
+  const me = D.people[0], d = h => new Date(Date.now() - h * 3600e3).toISOString();
+  J.push({ t: d(2), acces_id: me.id, nom: me.nom, role: 'admin', depot: '', action: 'parametre', objet: 'Gasoil (HT), €/L', detail: '1,92 → 1,95' });
+  J.push({ t: d(26), acces_id: me.id, nom: me.nom, role: 'admin', depot: '', action: 'produit_modifie', objet: 'Tomate ronde', detail: 'colis par palette : (vide) → 96' });
+  J.push({ t: d(30), acces_id: 'd4', nom: 'Léa', role: 'acheteur', depot: 'RV', action: 'fournisseur_cree', objet: 'Ferme du Ventoux (démo)', detail: 'dépôts livrés : RV' });
+  J.push({ t: d(50), acces_id: me.id, nom: me.nom, role: 'admin', depot: '', action: 'invitation_creee', objet: 'Hugo', detail: 'acheteur, DYN' });
+  J.push({ t: d(70), acces_id: 'd4', nom: 'Léa', role: 'acheteur', depot: 'RV', action: 'invitation_utilisee', objet: 'Léa', detail: 'nouvel appareil' });
+  J.push({ t: d(71), acces_id: me.id, nom: me.nom, role: 'admin', depot: '', action: 'admin_echec', objet: '', detail: 'mauvais mot de passe (1/5)' });
+  J.push({ t: d(96), acces_id: me.id, nom: me.nom, role: 'admin', depot: '', action: 'acces_desactive', objet: 'Ancien stagiaire', detail: '' });
+  J.sort((a, b) => (a.t < b.t ? 1 : -1));
+  return (D.journal = J);
+}
 M.adminLogin = async pwd => {
   if (!M.isAdmin()) throw new Error('Ce code n’est pas un code administrateur');
   if (S.cfg.mode === 'demo') {
     if (pwd !== 'demo') { await new Promise(r => setTimeout(r, 600)); throw new Error('Mot de passe incorrect (en démo : demo)'); }
-    S.adm = { token: 'demo', until: 0 }; M.adminTouch(); demoAdmin().journal.unshift({ t: new Date().toISOString(), role: 'admin (Toi)', depot: '', action: 'admin_ouverture', detail: 'session administrateur ouverte' }); M.emit('admin'); return;
+    S.adm = { token: 'demo', until: 0 }; M.adminTouch(); demoJournal().unshift({ t: new Date().toISOString(), acces_id: 'd1', nom: 'Toi (démo)', role: 'admin', depot: '', action: 'admin_ouverture', objet: '', detail: 'session administrateur ouverte' }); M.emit('admin'); return;
   }
   const j = await M.api.call({ action: 'admin_login', code: S.cfg.code, password: pwd });
   S.adm = { token: j.token, until: 0 }; M.adminTouch(); M.emit('admin');
@@ -372,16 +396,26 @@ M.adminOp = async (op, args) => {
   catch (e) { if (e.session) M.adminLock('expired'); throw e; }
 };
 function demoOp(op, a) {
-  const D = demoAdmin(); const log = (action, detail) => D.journal.unshift({ t: new Date().toISOString(), role: 'admin (Toi)', depot: '', action, detail });
-  if (op === 'list') return { ok: true, people: D.people, journal: D.journal };
+  const D = demoAdmin(); demoJournal();
+  const log = (action, detail, objet) => D.journal.unshift({ t: new Date().toISOString(), acces_id: 'd1', nom: 'Toi (démo)', role: 'admin', depot: '', action, objet: objet || '', detail: detail || '' });
+  if (op === 'list') {
+    const d30 = new Date(Date.now() - 30 * 864e5).toISOString();
+    D.people.forEach(p => { p.actions30 = D.journal.filter(x => x.acces_id === p.id && x.t >= d30 && /^(prix_|produit_|fournisseur_|parametre)/.test(x.action)).length; p.cree_par = p.cree_par || (p.moi ? 'Installation' : 'Toi (démo)'); p.inscrit_le = p.inscrit_le || (p.dernier_acces ? new Date(Date.parse(p.dernier_acces) - 20 * 864e5).toISOString() : ''); });
+    return { ok: true, people: D.people };
+  }
+  if (op === 'activity') {
+    const K = { prix: /^prix_/, catalogue: /^(produit_|fournisseur_|parametre)/, acces: /^(invitation_|acces_|admin_|mot_de_passe|connexion)/ };
+    let rows = D.journal.slice(); if (a.person) rows = rows.filter(x => x.acces_id === a.person); if (a.kind && K[a.kind]) rows = rows.filter(x => K[a.kind].test(x.action));
+    const off = a.offset || 0, lim = a.limit || 150; return { ok: true, total: rows.length, rows: rows.slice(off, off + lim) };
+  }
   if (op === 'invite') { if (!String(a.nom || '').trim()) throw new Error('Indique le prénom de la personne'); if (a.role === 'acheteur' && M.DEPS.indexOf(a.depot) < 0) throw new Error('Choisis le dépôt de l’acheteur');
     const id = 'd' + M.uid(); D.people.push({ id, nom: a.nom.trim(), depot: a.depot || '', role: a.role || 'acheteur', actif: true, dernier_acces: '', fin: '··', appareils: 0, invitation: new Date(Date.now() + 72 * 3600e3).toISOString() });
-    log('invitation_creee', a.nom + ' (' + a.role + (a.depot ? ', ' + a.depot : '') + ')'); return { ok: true, id, jeton: 'demo' + M.uid() + M.uid(), expire: new Date(Date.now() + 72 * 3600e3).toISOString() }; }
+    log('invitation_creee', a.role + (a.depot ? ', ' + a.depot : ''), a.nom); return { ok: true, id, jeton: 'demo' + M.uid() + M.uid(), expire: new Date(Date.now() + 72 * 3600e3).toISOString() }; }
   const p = D.people.find(x => x.id === a.id);
-  if (op === 'reinvite') { p.invitation = new Date(Date.now() + 72 * 3600e3).toISOString(); log('invitation_creee', p.nom + ' (nouvel appareil)'); return { ok: true, jeton: 'demo' + M.uid() + M.uid(), expire: p.invitation }; }
-  if (op === 'revoke' || op === 'restore') { if (p.moi) throw new Error('Tu ne peux pas désactiver ton propre accès'); p.actif = op === 'restore'; log(op === 'revoke' ? 'acces_desactive' : 'acces_reactive', p.nom); return { ok: true }; }
-  if (op === 'param') { log('parametre', a.key + ' : ' + S.data.params[a.key] + ' → ' + a.value); return { ok: true, key: a.key, value: a.value }; }
-  if (op === 'product') { log('catalogue', 'produit ' + a.row.id + ' modifié'); return { ok: true }; }
+  if (op === 'reinvite') { p.invitation = new Date(Date.now() + 72 * 3600e3).toISOString(); log('invitation_creee', 'nouvel appareil', p.nom); return { ok: true, jeton: 'demo' + M.uid() + M.uid(), expire: p.invitation }; }
+  if (op === 'revoke' || op === 'restore') { if (p.moi) throw new Error('Tu ne peux pas désactiver ton propre accès'); p.actif = op === 'restore'; log(op === 'revoke' ? 'acces_desactive' : 'acces_reactive', '', p.nom); return { ok: true }; }
+  if (op === 'param') { const d = M.PARAM_DEFS.find(x => x.k === a.key); log('parametre', String(S.data.params[a.key]).replace('.', ',') + ' → ' + String(a.value).replace('.', ','), d ? d.l : a.key); return { ok: true, key: a.key, value: a.value }; }
+  if (op === 'product') { const pr = S.ix.prod.get(a.row.id) || {}; log('produit_modifie', ['colis_palette', 'kg_palette', 'poids_colis', 'pieces_colis'].filter(k => a.row[k] !== undefined && String(a.row[k]) !== String(pr[k] == null ? '' : pr[k])).map(k => ({ colis_palette: 'colis par palette', kg_palette: 'kg par palette', poids_colis: 'poids du colis', pieces_colis: 'pièces par colis' })[k] + ' : ' + (pr[k] || '(vide)') + ' → ' + (a.row[k] || '(vide)')).join(' ; '), pr.nom || a.row.id); return { ok: true }; }
   throw new Error('Action inconnue');
 }
 /* marge de recouvrement : un envoi d'un autre dépôt écrit pendant notre lecture n'est jamais manqué */
@@ -396,6 +430,7 @@ M.savePrice = async row => {
   if (i >= 0) { row.cree = S.data.prix[i].cree; S.data.prix[i] = Object.assign({}, S.data.prix[i], row, { maj: now }); }
   else { row.cree = row.cree || now; row.maj = now; S.data.prix.push(row); }
   if (S.cfg.mode === 'live') S.queue.push({ t: 'prix', op: 'upsert', row: Object.assign({}, row), ts: now });
+  else if (S.demoAdm && S.demoAdm.journal) { const me = S.cfg.me || {}; S.demoAdm.journal.unshift({ t: now, acces_id: 'd1', nom: 'Toi (démo)', role: me.role, depot: row.depot, action: i >= 0 ? 'prix_modifie' : 'prix_cree', objet: [row.produit, row.depot, M.px(M.num(row.prix)) + '/' + row.unite, row.fournisseur].filter(Boolean).join(', '), detail: i >= 0 ? 'modifié dans la démo' : '' }); }
   await M.commit(['prix']);
 };
 M.deletePrice = async id => {

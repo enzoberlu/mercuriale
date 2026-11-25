@@ -36,10 +36,11 @@
   }
   function drawChrome(route) {
     const nav = document.getElementById('nav'); const desk = window.matchMedia('(min-width: 1000px)').matches;
-    const items = NAV.filter(n => (desk || !n.desk) && (n.r !== 'saisir' || M.canWrite()));
+    // l'administrateur voit toujours « Saisir » : verrouillé, l'écran lui demande le mot de passe
+    const items = NAV.filter(n => (desk || !n.desk) && (n.r !== 'saisir' || M.canWrite() || M.isAdmin()));
     nav.style.gridTemplateColumns = desk ? '' : `repeat(${items.length}, 1fr)`;
     nav.innerHTML = items.map(n => n.fab ? `<a href="#/saisir" class="fab" ${route === n.r ? 'aria-current="page"' : ''}><span class="fab-c">${I[n.i]}</span><span class="lbl">${n.l}</span></a>`
-      : `<a href="#/${n.r}" ${route === n.r || (route === 'produit' && n.r === 'comparer') ? 'aria-current="page"' : ''}>${I[n.i]}<span>${n.l}</span></a>`).join('');
+      : `<a href="#/${n.r}" ${route === n.r || (route === 'produit' && n.r === 'comparer') || (route === 'admin' && n.r === 'reglages') ? 'aria-current="page"' : ''}>${I[n.i]}<span>${n.l}</span></a>`).join('');
     document.getElementById('gear').hidden = desk;
     const d = M.myDep(); document.getElementById('medep').innerHTML = S.cfg ? `<span class="depchip c-${esc(d)}"><i></i><span class="dc-code">${esc(d)}</span><span class="dc-full">${esc(M.DEPN[d] || d)}</span></span>` : '';
     drawSync();
