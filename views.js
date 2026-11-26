@@ -83,7 +83,7 @@
       ['#/produit/' + encodeURIComponent((Array.from(S.ix.prod.keys())[0]) || ''), 'Ouvrir une fiche produit', 'Toutes les offres par fournisseur, rendues chez toi avec le délai de transfert, et l’évolution des prix.'],
       ['#/optimiser', 'Optimiser les achats', 'Où acheter moins cher, coche des produits, puis l’onglet Navette : palettes, gain net, rotations.'],
       ['#/optimiser?sim=1', 'Simuler une navette', 'Change les rotations et les palettes : coût par palette, chauffeurs, comparaison avec le marché.'],
-      ['#/reglages', 'Essayer le mode administrateur', 'Paramètres, palettisation et accès des acheteurs sont protégés par un mot de passe (en démo : demo). Invite un acheteur, désactive un accès, regarde le journal.']
+      ['#/reglages', 'Essayer l’administration', 'Paramètres, palettisation et accès des acheteurs sont réservés aux administrateurs. Invite un acheteur, désactive un accès, regarde le journal.']
     ];
     return `<div class="section"><div class="sh"><h2>Que tester ?</h2><button class="linkbtn" type="button" data-tourdone>Masquer</button></div>
       <div class="panel flush"><ol class="list" style="counter-reset:t">${steps.map(([h, t, s], i) => `<li><a class="li" href="${h}"><span class="tour-n num">${i + 1}</span><div class="main"><div class="t">${esc(t)}</div><div class="s" style="white-space:normal">${esc(s)}</div></div>${I.chev}</a></li>`).join('')}
@@ -108,10 +108,7 @@
   /* ============================================================ SAISIR */
   V.saisir = (root, q) => {
     if (!M.canWrite()) {
-      root.innerHTML = M.isAdmin() ? `<div class="empty"><h2 class="h3">Mode administrateur verrouillé</h2><p>Ton accès administrateur n’est rattaché à aucun dépôt : entre ton mot de passe pour saisir un prix.</p><button class="btn primary" type="button" id="unl">${I.edit}Déverrouiller</button></div>`
-        : `<div class="empty"><h2 class="h3">Accès en lecture seule</h2><p>Tu peux consulter tous les prix, mais ton accès ne permet pas d’en saisir. Pour saisir, demande à l’administrateur un accès Acheteur pour ton dépôt.</p><a class="btn" href="#/comparer">Comparer les prix</a></div>`;
-      const u = $('#unl', root);
-      if (u) { u.onclick = () => M.unlockSheet(() => M.emit('route')); if (!document.querySelector('.sheet-bg')) M.unlockSheet(() => M.emit('route')); }
+      root.innerHTML = `<div class="empty"><h2 class="h3">Accès en lecture seule</h2><p>Tu peux consulter tous les prix, mais ton accès ne permet pas d’en saisir. Pour saisir, demande à l’administrateur un accès Acheteur pour ton dépôt.</p><a class="btn" href="#/comparer">Comparer les prix</a></div>`;
       return;
     }
     const edit = q.id ? S.data.prix.find(r => r.id === q.id) : null;
@@ -453,7 +450,7 @@
       $('#pa-ok', s.el).onclick = async () => {
         const g = id => { const v = M.num($('#' + id, s.el).value); return v > 0 ? v : ''; };
         try { await M.saveProduct({ id: p.id, nom: p.nom, poids_colis: g('pa-w'), pieces_colis: g('pa-p'), colis_palette: g('pa-c'), kg_palette: g('pa-k') }); }
-        catch (e) { M.toast('Non enregistré : ' + e.message, 'bad'); if (e.session) s.close(); return; }
+        catch (e) { M.toast('Non enregistré : ' + e.message, 'bad'); return; }
         s.close(); M.toast('Palettisation enregistrée'); V.produit(root, q, pid);
       };
     });
@@ -683,7 +680,7 @@
   const ACT_L = { prix_cree: 'Prix ajouté', prix_modifie: 'Prix modifié', prix_supprime: 'Prix supprimé', prix_restaure: 'Prix rétabli', produit_cree: 'Produit créé', produit_modifie: 'Produit modifié',
     fournisseur_cree: 'Fournisseur créé', fournisseur_modifie: 'Fournisseur modifié', parametre: 'Paramètre modifié', catalogue: 'Catalogue modifié', connexion: 'Connexion d’un appareil',
     admin_ouverture: 'Mode administrateur ouvert', admin_echec: 'Mot de passe refusé', admin_refuse: 'Tentative refusée', invitation_creee: 'Invitation créée', invitation_utilisee: 'Inscription',
-    acces_desactive: 'Accès désactivé', acces_reactive: 'Accès réactivé', mot_de_passe: 'Mot de passe changé', envoi: 'Saisies reçues' };
+    acces_desactive: 'Accès désactivé', acces_reactive: 'Accès réactivé', acces_remplace: 'Code administrateur remplacé', mot_de_passe: 'Mot de passe changé', envoi: 'Saisies reçues' };
   const inviteLink = jeton => {
     const base = location.href.split('#')[0].split('?')[0];
     const api = S.cfg.mode === 'live' ? S.cfg.apiUrl : 'https://script.google.com/macros/s/DEMO/exec';
@@ -699,25 +696,12 @@
     $('#inv-c', s.el).onclick = async () => { try { await navigator.clipboard.writeText(txt); M.toast('Invitation copiée'); } catch (e) { $('#inv-t', s.el).select(); M.toast('Sélectionne le texte et copie-le'); } };
     $('#inv-s', s.el).onclick = async () => { try { if (navigator.share) { await navigator.share({ title: 'Mercuriale', text: txt }); return; } } catch (e) { if (e && e.name === 'AbortError') return; } location.href = 'mailto:?subject=' + encodeURIComponent('Ton accès à Mercuriale') + '&body=' + encodeURIComponent(txt); };
   };
-  /* fenêtre « mot de passe administrateur » */
-  M.unlockSheet = (after) => {
-    const s = M.sheet(`<p class="muted small" style="margin-bottom:12px">Paramètres de calcul, palettisation, accès des acheteurs et prix des autres dépôts sont protégés. Le mot de passe n’est jamais gardé sur cet appareil ; le mode administrateur se reverrouille seul après ${M.ADMIN_MIN} minutes sans action.</p>
-      <form id="unf" autocomplete="on"><input type="text" name="username" autocomplete="username" value="${esc((S.cfg && S.cfg.me && S.cfg.me.nom) || 'Mercuriale admin')}" hidden>
-      <div class="field"><label for="unp">Mot de passe administrateur</label><input class="input" type="password" id="unp" autocomplete="current-password" required>${S.cfg.mode === 'demo' ? '<span class="hint">Démo : le mot de passe est <b>demo</b>.</span>' : ''}</div>
-      <p class="small" id="une" style="color:var(--bad);margin:0 0 10px" role="alert" hidden></p>
-      <button class="btn primary big block" type="submit" id="ung">${I.check}Déverrouiller</button></form>`, { title: 'Mode administrateur' });
-    $('#unf', s.el).addEventListener('submit', async e => {
-      e.preventDefault(); const b = $('#ung', s.el), er = $('#une', s.el); b.disabled = true; er.hidden = true;
-      try { await M.adminLogin($('#unp', s.el).value); s.close(); M.toast('Mode administrateur ouvert pour ' + M.ADMIN_MIN + ' min'); if (after) after(); }
-      catch (x) { er.textContent = x.message || String(x); er.hidden = false; b.disabled = false; const i = $('#unp', s.el); i.value = ''; i.focus(); }
-    });
-  };
-  M.requireAdmin = fn => { if (M.adminOn()) { M.adminTouch(); fn(); } else M.unlockSheet(fn); };
+  /* actions réservées : le serveur refuse de toute façon un code qui n'est pas administrateur */
+  M.requireAdmin = fn => { if (M.isAdmin()) fn(); else M.toast('Réservé à l’administrateur', 'bad'); };
 
   V.reglages = (root) => {
-    const c = S.cfg; const live = c.mode === 'live'; const P = M.P(); const editP = M.adminOn();
+    const c = S.cfg; const live = c.mode === 'live'; const P = M.P(); const adm = M.isAdmin();
     const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    const left = S.adm ? Math.max(1, Math.round((S.adm.until - Date.now()) / 60000)) : 0;
     root.innerHTML = `${banners()}
       <div class="page-head"><div><h1>Réglages</h1></div></div>
       <div class="set-group"><h2>Profil</h2><div class="panel">
@@ -736,18 +720,17 @@
           : window.__mercDemoFile ? `<p class="muted" style="margin-bottom:14px">Version de test : données fictives gardées sur cet ordinateur. Dans la vraie version, les prix sont partagés entre les 4 dépôts par un Google Sheet commun.</p><button class="btn primary" type="button" data-avis>${I.edit}Donner mon avis</button>`
           : `<p class="muted" style="margin-bottom:14px">Tu utilises les données de démonstration. Pour partager les prix entre les 4 dépôts, rejoins la base de l’équipe avec l’invitation reçue (ou, pour l’administrateur, l’adresse du serveur et le code administrateur).</p><button class="btn primary" id="rconn" type="button">Rejoindre la base de l’équipe</button>`}
       </div></div>
-      ${M.isAdmin() ? `<div class="set-group"><h2>Administration</h2>
-        ${editP ? `<div class="panel"><div class="row wrap" style="justify-content:space-between;margin-bottom:12px"><div><span class="badge leaf">mode administrateur ouvert</span> <span class="small muted">se reverrouille après ${M.ADMIN_MIN} min sans action (encore ${left} min)</span></div><button class="btn sm" id="alock" type="button">Verrouiller</button></div>
-            <a class="btn primary" href="#/admin">${I.list}Personnes et activité</a><p class="small muted" style="margin-top:10px">Qui est inscrit, qui a fait quoi : chaque prix ajouté, modifié ou supprimé, chaque changement du catalogue, des paramètres et des accès.</p></div>`
-        : `<div class="panel"><p class="muted" style="margin-bottom:12px">Les réglages sensibles sont protégés par le mot de passe administrateur : paramètres de calcul, palettisation, accès des acheteurs (invitations, désactivation), historique de toutes les actions et prix des autres dépôts.</p><button class="btn primary" id="aunl" type="button">${I.edit}Déverrouiller</button></div>`}</div>` : ''}
+      ${adm ? `<div class="set-group"><h2>Administration</h2><div class="panel">
+        <a class="btn primary" href="#/admin">${I.list}Personnes et activité</a>
+        <p class="small muted" style="margin-top:10px">Inviter quelqu’un, désactiver un accès, voir qui a fait quoi : chaque prix ajouté, modifié ou supprimé, chaque changement du catalogue, des paramètres et des accès.</p></div></div>` : ''}
       <div class="set-group" ${window.__mercDemoFile ? 'hidden' : ''}><h2>Installer sur le téléphone</h2><div class="panel">
         ${window.__mercInstall ? `<button class="btn primary" id="rinst" type="button">${I.download}Installer Mercuriale</button>` : ''}
         <p class="muted" ${window.__mercInstall ? 'style="margin-top:12px"' : ''}>${ios ? 'Sur iPhone : ouvre ce lien dans Safari, touche le bouton Partager puis « Sur l’écran d’accueil ».' : 'Sur Android : menu ⋮ de Chrome puis « Installer l’application » ou « Ajouter à l’écran d’accueil ». Sur ordinateur : icône d’installation dans la barre d’adresse de Chrome ou Edge.'}</p>
       </div></div>
-      <div class="set-group"><h2>Paramètres de calcul</h2>${editP ? '' : `<p class="small muted" style="margin:-4px 0 10px">${M.isAdmin() ? 'Déverrouille le mode administrateur pour les modifier.' : 'Modifiables uniquement par l’administrateur, avec son mot de passe.'}</p>`}
+      ${adm ? `<div class="set-group"><h2>Paramètres de calcul</h2><p class="small muted" style="margin:-4px 0 10px">Communs aux 4 dépôts. Chaque changement est noté dans l’historique.</p>
         ${(() => { let h = '', open = false; M.PARAM_DEFS.forEach(d => { if (d.g) { if (open) h += '</div>'; h += `<h3 class="muted" style="margin:14px 2px 8px">${esc(d.g)}</h3><div class="panel flush">`; open = true; return; }
-          h += `<div class="param"><label for="p-${d.k}">${esc(d.l)} <span class="faint small">${esc(d.u)}</span></label>${editP ? `<input class="input" id="p-${d.k}" data-p="${d.k}" inputmode="decimal" value="${esc(String(P[d.k]).replace('.', ','))}">` : `<span class="num" id="p-${d.k}" style="text-align:right;font-size:18px">${esc(String(P[d.k]).replace('.', ','))}</span>`}</div>`; }); return h + (open ? '</div>' : ''); })()}
-        ${editP ? `<div class="row" style="margin-top:10px"><button class="btn sm" id="rpreset" type="button">Revenir aux valeurs de l’outil navettes</button></div>` : ''}</div>
+          h += `<div class="param"><label for="p-${d.k}">${esc(d.l)} <span class="faint small">${esc(d.u)}</span></label><input class="input" id="p-${d.k}" data-p="${d.k}" inputmode="decimal" value="${esc(String(P[d.k]).replace('.', ','))}"></div>`; }); return h + (open ? '</div>' : ''); })()}
+        <div class="row" style="margin-top:10px"><button class="btn sm" id="rpreset" type="button">Revenir aux valeurs de l’outil navettes</button></div></div>` : ''}
       <div class="set-group"><h2>Catalogue</h2><div class="panel"><p class="muted">${S.ix.prod.size} produits, ${S.data.fournisseurs.length} fournisseurs, ${S.data.prix.filter(r => !Number(r.supprime)).length} prix chargés.</p>
         <div class="row wrap" style="margin-top:12px"><button class="btn" id="rcat" type="button">${I.download}Exporter le catalogue</button></div></div></div>
       <div class="set-group"><h2>Cet appareil</h2><div class="panel"><p class="muted small">Mercuriale ${esc(M.VERSION)}. Les données sont gardées sur l’appareil pour marcher sans réseau. Si ton accès est désactivé par l’administrateur, elles sont effacées automatiquement.</p>
@@ -756,24 +739,22 @@
     bindSeg(root, 'rdep', v => { c.depot = v; if (c.mode === 'demo' && c.me) c.me.depot = v; M.saveCfg(); M.ui.opt.dest = v; saveUi(); M.emit('route'); });
     bindSeg(root, 'rtheme', v => { c.theme = v; M.saveCfg(); M.applyTheme(); });
     const rs = $('#rsync', root); if (rs) rs.onclick = async () => { await M.sync({}); if (!S.sync.error && S.cfg) M.toast('Base à jour'); if (S.cfg) V.reglages(root); };
-    const rd = $('#rdisc', root); if (rd) rd.onclick = async () => { if (await M.confirm('Se déconnecter ?', S.queue.length ? `${S.queue.length} saisie(s) n’ont pas encore été envoyées et seront perdues.` : 'Pour revenir, il faudra une nouvelle invitation de l’administrateur.', 'Se déconnecter', true)) { M.adminLock(); await M.reset(); location.hash = '#/bienvenue'; } };
+    const rd = $('#rdisc', root); if (rd) rd.onclick = async () => { if (await M.confirm('Se déconnecter ?', S.queue.length ? `${S.queue.length} saisie(s) n’ont pas encore été envoyées et seront perdues.` : 'Pour revenir, il faudra une nouvelle invitation de l’administrateur.', 'Se déconnecter', true)) { await M.reset(); location.hash = '#/bienvenue'; } };
     const rc = $('#rclr', root); if (rc) rc.onclick = async () => { S.rejected = []; await M.saveQueue(); V.reglages(root); };
     const rconn = $('#rconn', root); if (rconn) rconn.onclick = () => M.connectSheet();
-    const au = $('#aunl', root); if (au) au.onclick = () => M.unlockSheet(() => V.reglages(root));
-    const al = $('#alock', root); if (al) al.onclick = () => { M.adminLock(); M.toast('Mode administrateur verrouillé'); V.reglages(root); };
     const ri = $('#rinst', root); if (ri) ri.onclick = async () => { const e = window.__mercInstall; if (!e) return; e.prompt(); await e.userChoice; window.__mercInstall = null; V.reglages(root); };
     $$('[data-p]', root).forEach(inp => inp.onchange = async () => {
       const k = inp.dataset.p; const v = k === 'navMode' ? inp.value : M.num(inp.value);
       if (k !== 'navMode' && !(v >= 0)) { M.toast('Valeur invalide', 'bad'); return; }
       inp.disabled = true;
       try { await M.setParam(k, v); M.toast('Paramètre enregistré pour tous les dépôts'); }
-      catch (e) { M.toast('Non enregistré : ' + e.message, 'bad'); inp.value = String(M.P()[k]).replace('.', ','); if (e.session) { V.reglages(root); return; } }
+      catch (e) { M.toast('Non enregistré : ' + e.message, 'bad'); inp.value = String(M.P()[k]).replace('.', ','); }
       inp.disabled = false;
     });
     const rp = $('#rpreset', root); if (rp) rp.onclick = async () => { if (!(await M.confirm('Revenir aux valeurs par défaut ?', 'Tous les paramètres de calcul reprennent les valeurs de l’outil navettes, pour tous les dépôts.', 'Rétablir'))) return;
       const d = M.defaultParams(); try { for (const k of Object.keys(d)) { if (S.data.params[k] !== d[k]) await M.setParam(k, d[k]); } M.toast('Valeurs rétablies'); } catch (e) { M.toast('Interrompu : ' + e.message, 'bad'); } V.reglages(root); };
     $('#rcat', root).onclick = () => { const cols = ['id', 'nom', 'famille', 'categorie', 'unite', 'poids_colis', 'pieces_colis', 'colis_palette', 'kg_palette']; M.download('mercuriale_catalogue.csv', M.csv(Array.from(S.ix.prod.values()), cols)); };
-    $('#rreset', root).onclick = async () => { if (await M.confirm('Effacer les données de cet appareil ?', live && S.queue.length ? `${S.queue.length} saisie(s) non envoyée(s) seront perdues. Les données déjà envoyées restent dans la base. Pour revenir, il faudra une nouvelle invitation.` : 'Les données déjà envoyées restent dans la base de l’équipe.', 'Effacer', true)) { M.adminLock(); await M.reset(); location.hash = '#/bienvenue'; } };
+    $('#rreset', root).onclick = async () => { if (await M.confirm('Effacer les données de cet appareil ?', live && S.queue.length ? `${S.queue.length} saisie(s) non envoyée(s) seront perdues. Les données déjà envoyées restent dans la base. Pour revenir, il faudra une nouvelle invitation.` : 'Les données déjà envoyées restent dans la base de l’équipe.', 'Effacer', true)) { await M.reset(); location.hash = '#/bienvenue'; } };
   };
 
   /* ============================================================ ADMINISTRATION : PERSONNES ET ACTIVITÉ */
@@ -784,11 +765,6 @@
   const fmtD = iso => { const d = new Date(iso); return iso && isFinite(d) ? d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'; };
   V.admin = (root, q) => {
     if (!M.isAdmin()) { location.replace('#/reglages'); return; }
-    if (!M.adminOn()) {
-      root.innerHTML = `<div class="page-head"><div><h1>Personnes et activité</h1></div></div><div class="panel"><div class="empty"><h2 class="h3">Mode administrateur verrouillé</h2><p>Cette page demande le mot de passe administrateur.</p><button class="btn primary" type="button" id="aunl2">${I.edit}Déverrouiller</button></div></div>`;
-      $('#aunl2', root).onclick = () => M.unlockSheet(() => V.admin(root, q)); return;
-    }
-    M.adminTouch();
     const U = M.ui.adm; if (q && q.person !== undefined) { U.person = q.person; U.tab = 'act'; }
     root.innerHTML = `<div class="page-head"><div><h1>Personnes et activité</h1><p class="sub">Réservé à l’administrateur. Tout est enregistré par le serveur : une appli modifiée ne peut pas effacer ses traces.</p></div>
         <a class="btn" href="#/reglages">Réglages</a></div>
@@ -832,13 +808,13 @@
         <div class="field" id="iv-df"><span class="lbl">Dépôt <span class="faint small" id="iv-dh">(obligatoire)</span></span>${segH('ivd', M.DEPS.map(d => [d, d]), dep)}</div>
         <p class="small" id="iv-e" style="color:var(--bad);margin:0 0 10px" role="alert" hidden></p>
         <button class="btn primary big block" type="button" id="iv-go">Créer l’invitation</button>`, { title: 'Inviter quelqu’un' });
-      const hint = { acheteur: 'Saisit et consulte les prix de son dépôt.', lecture: 'Consulte tout, ne saisit rien (direction, comptabilité).', admin: 'Réglages sensibles avec le mot de passe administrateur. Avec un dépôt, il peut aussi saisir des prix sans déverrouiller.' };
+      const hint = { acheteur: 'Saisit et consulte les prix de son dépôt.', lecture: 'Consulte tout, ne saisit rien (direction, comptabilité).', admin: 'Accès complet, sans mot de passe : réglages, paramètres, accès des autres et historique. À donner seulement à une personne de confiance.' };
       bindSeg(s.el, 'ivr', v => { role = v; $('#iv-h', s.el).textContent = hint[v]; $('#iv-dh', s.el).textContent = v === 'acheteur' ? '(obligatoire)' : '(facultatif)'; });
       bindSeg(s.el, 'ivd', v => { dep = v; });
       $('#iv-go', s.el).onclick = async () => {
         const nom = $('#iv-n', s.el).value.trim(); const er = $('#iv-e', s.el); er.hidden = true;
         try { const r = await M.adminOp('invite', { nom, role, depot: dep }); s.close(); shareInvite(nom, r); peopleTab(box, root); }
-        catch (e) { er.textContent = e.message; er.hidden = false; if (e.session) { s.close(); V.admin(root); } }
+        catch (e) { er.textContent = e.message; er.hidden = false; }
       };
     };
   }
@@ -876,7 +852,6 @@
     load(false);
   }
   function adminFail(e, box, root, toastOnly) {
-    if (e && e.session) { M.toast('Mode administrateur verrouillé', 'bad'); V.admin(root); return; }
     if (toastOnly) { M.toast(e.message || String(e), 'bad'); return; }
     box.innerHTML = `<div class="panel"><p class="muted">Impossible de charger : ${esc(e.message || String(e))}</p></div>`;
   }
@@ -956,7 +931,7 @@
       try {
         const me = await M.connect($('#capi', s.el).value, $('#ccode', s.el).value, $('#cname', s.el).value.trim());
         M.lsSet('wiped', null); s.close(); location.hash = '#/accueil'; M.emit('route'); M.persist();
-        M.toast(me.role === 'admin' ? 'Connecté en administrateur (mode administrateur verrouillé)' : 'Connecté : ' + (M.DEPN[me.depot] || me.depot));
+        M.toast(me.role === 'admin' ? 'Connecté en administrateur' : 'Connecté : ' + (M.DEPN[me.depot] || me.depot));
       } catch (e) { if (e && e.superseded) return; err.style.color = 'var(--bad)'; err.textContent = 'Connexion impossible : ' + (e.name === 'AbortError' ? 'le serveur n’a pas répondu à temps, réessaie dans un instant.' : (e.message || e)); err.hidden = false; b.disabled = false; b.textContent = 'Se connecter'; }
     };
   };

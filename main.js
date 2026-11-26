@@ -36,7 +36,7 @@
   }
   function drawChrome(route) {
     const nav = document.getElementById('nav'); const desk = window.matchMedia('(min-width: 1000px)').matches;
-    // « Saisir » est visible pour tout le monde ; l'écran explique si l'accès ne permet pas de saisir (ou demande le mot de passe à l'administrateur)
+    // « Saisir » est visible pour tout le monde ; l'écran explique si l'accès (lecture seule) ne permet pas de saisir
     const items = NAV.filter(n => desk || !n.desk);
     nav.style.gridTemplateColumns = desk ? '' : `repeat(${items.length}, 1fr)`;
     nav.innerHTML = items.map(n => n.fab ? `<a href="#/saisir" class="fab" ${route === n.r ? 'aria-current="page"' : ''}><span class="fab-c">${I[n.i]}</span><span class="lbl">${n.l}</span></a>`
@@ -102,11 +102,6 @@
   });
   let rt = null; function scheduleRender() { clearTimeout(rt); rt = setTimeout(render, 60); }
   M.on('rejected', () => M.toast('Une saisie a été refusée par le serveur : voir Réglages', 'bad'));
-  // mode administrateur ouvert / fermé : l'écran courant se met à jour (sauf pendant une saisie)
-  M.on('admin', why => {
-    if (why === 'expired') M.toast('Mode administrateur verrouillé (15 min sans action)');
-    const { route } = parse(); if (booted && route !== 'saisir' && !document.querySelector('.sheet-bg')) scheduleRender();
-  });
 
   let booted = false;
   async function boot() {
@@ -123,13 +118,7 @@
     render();
     window.addEventListener('online', () => { S.sync.online = true; drawSync(); M.sync({ quiet: true }); });
     window.addEventListener('offline', () => { S.sync.online = false; drawSync(); });
-    let hiddenAt = 0;
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
-      if (S.adm && hiddenAt && Date.now() - hiddenAt > 5 * 60000) M.adminLock('expired'); // appli quittée plus de 5 min : on reverrouille
-      M.sync({ quiet: true });
-    });
-    setInterval(() => { if (S.adm && Date.now() > S.adm.until) M.adminLock('expired'); }, 20000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') M.sync({ quiet: true }); });
     setInterval(() => { if (document.visibilityState === 'visible') M.sync({ quiet: true }); }, 120000);
     if (S.cfg && S.cfg.mode === 'live') { M.sync({ quiet: true }); M.persist(); }
     window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); window.__mercInstall = e; });

@@ -3,7 +3,7 @@
 const M = window.M = {};
 
 /* ------------------------------------------------------------ constantes */
-M.VERSION = '1.4.0';
+M.VERSION = '1.5.0';
 M.DEPS = ['HBA', 'HBO', 'RV', 'DYN'];                // ordre des lignes de navette (outil existant)
 M.DEPN = { HBA: 'HBA', HBO: 'HBO', RV: 'Relais Vert', DYN: 'DYNAMIS' };
 M.DEPCITY = { HBA: 'Saint-Médard-d’Eyrans (33)', HBO: 'Vendargues (34)', RV: 'Carpentras (84)', DYN: 'Rungis (94)' };
@@ -107,7 +107,6 @@ const S = M.S = {
   data: { prix: [], produits: [], fournisseurs: [], volumes: [], params: M.defaultParams(), acces: [] },
   queue: [], rejected: [],
   sync: { busy: false, last: null, error: null, online: navigator.onLine !== false },
-  adm: null,                  // session administrateur : en mémoire seulement, jamais enregistrée sur l'appareil
   ix: null
 };
 M.P = () => S.data.params;
@@ -115,10 +114,8 @@ M.myDep = () => (S.cfg && S.cfg.me && S.cfg.me.depot) || (S.cfg && S.cfg.depot) 
 M.ownDep = () => (S.cfg && S.cfg.me && S.cfg.me.depot) || '';                                // dépôt pour lequel ce code peut saisir
 M.role = () => (S.cfg && S.cfg.me && S.cfg.me.role) || 'lecture';
 M.isAdmin = () => M.role() === 'admin';
-/* mode administrateur : code administrateur + mot de passe, se reverrouille seul après 15 min sans action */
-M.ADMIN_MIN = 15;
-M.adminOn = () => M.isAdmin() && !!S.adm && Date.now() < S.adm.until;
-M.adminTouch = () => { if (S.adm) S.adm.until = Date.now() + M.ADMIN_MIN * 60000; };
+/* droits administrateur : donnés par le rôle du code d'accès (le serveur le vérifie à chaque demande) */
+M.adminOn = () => M.isAdmin();
 M.canEditDep = d => M.adminOn() || (M.role() !== 'lecture' && !!M.ownDep() && d === M.ownDep());
 M.canWrite = () => M.role() !== 'lecture' && (!!M.ownDep() || M.adminOn());
 
@@ -320,7 +317,7 @@ async function readJ(r) {
     const er = new Error(j.error || 'Erreur serveur');
     if (/code d.acc[eè]s (inconnu|manquant|r[eé]voqu[eé])/i.test(er.message)) er.auth = true;
     if (j.revoked) er.revoked = true;
-    if (j.session) er.session = true;
+    if (j.session) { er.session = true; er.message = 'Le script du Google Sheet n’est pas à jour : installe Code.gs 1.5 (Gérer les déploiements → Nouvelle version).'; }
     throw er;
   }
   return j;
@@ -333,12 +330,12 @@ M.api = {
   },
   async push(ops) {
     const c = S.cfg;
-    return readJ(await fetchT(c.apiUrl, { method: 'POST', body: JSON.stringify({ action: 'push', code: c.code, adm: M.adminOn() ? S.adm.token : undefined, ops }) }, 60000));
+    return readJ(await fetchT(c.apiUrl, { method: 'POST', body: JSON.stringify({ action: 'push', code: c.code, ops }) }, 60000));
   },
   async call(body, apiUrl) { return readJ(await fetchT(apiUrl || S.cfg.apiUrl, { method: 'POST', body: JSON.stringify(body) }, 60000)); }
 };
 
-/* ------------------------------------------------------------ administration (mot de passe) */
+/* ------------------------------------------------------------ administration */
 const demoAdmin = () => S.demoAdm || (S.demoAdm = {
   people: [
     { id: 'd1', nom: 'Toi (démo)', depot: '', role: 'admin', actif: true, dernier_acces: new Date().toISOString(), fin: 'K7', appareils: 1, moi: true },
@@ -369,31 +366,14 @@ function demoJournal() {
   J.push({ t: d(30), acces_id: 'd4', nom: 'Léa', role: 'acheteur', depot: 'RV', action: 'fournisseur_cree', objet: 'Ferme du Ventoux (démo)', detail: 'dépôts livrés : RV' });
   J.push({ t: d(50), acces_id: me.id, nom: me.nom, role: 'admin', depot: '', action: 'invitation_creee', objet: 'Hugo', detail: 'acheteur, DYN' });
   J.push({ t: d(70), acces_id: 'd4', nom: 'Léa', role: 'acheteur', depot: 'RV', action: 'invitation_utilisee', objet: 'Léa', detail: 'nouvel appareil' });
-  J.push({ t: d(71), acces_id: me.id, nom: me.nom, role: 'admin', depot: '', action: 'admin_echec', objet: '', detail: 'mauvais mot de passe (1/5)' });
   J.push({ t: d(96), acces_id: me.id, nom: me.nom, role: 'admin', depot: '', action: 'acces_desactive', objet: 'Ancien stagiaire', detail: '' });
   J.sort((a, b) => (a.t < b.t ? 1 : -1));
   return (D.journal = J);
 }
-M.adminLogin = async pwd => {
-  if (!M.isAdmin()) throw new Error('Ce code n’est pas un code administrateur');
-  if (S.cfg.mode === 'demo') {
-    if (pwd !== 'demo') { await new Promise(r => setTimeout(r, 600)); throw new Error('Mot de passe incorrect (en démo : demo)'); }
-    S.adm = { token: 'demo', until: 0 }; M.adminTouch(); demoJournal().unshift({ t: new Date().toISOString(), acces_id: 'd1', nom: 'Toi (démo)', role: 'admin', depot: '', action: 'admin_ouverture', objet: '', detail: 'session administrateur ouverte' }); M.emit('admin'); return;
-  }
-  const j = await M.api.call({ action: 'admin_login', code: S.cfg.code, password: pwd });
-  S.adm = { token: j.token, until: 0 }; M.adminTouch(); M.emit('admin');
-};
-M.adminLock = (why) => {
-  const t = S.adm && S.adm.token; S.adm = null;
-  if (t && S.cfg && S.cfg.mode === 'live') M.api.call({ action: 'admin', op: 'logout', code: S.cfg.code, adm: t }).catch(() => {});
-  M.emit('admin', why || 'lock');
-};
 M.adminOp = async (op, args) => {
-  if (!M.adminOn()) { const e = new Error('Mode administrateur verrouillé'); e.session = true; throw e; }
-  M.adminTouch();
+  if (!M.isAdmin()) throw new Error('Réservé à l’administrateur');
   if (S.cfg.mode === 'demo') return demoOp(op, args || {});
-  try { return await M.api.call(Object.assign({ action: 'admin', op, code: S.cfg.code, adm: S.adm.token }, args || {})); }
-  catch (e) { if (e.session) M.adminLock('expired'); throw e; }
+  return M.api.call(Object.assign({ action: 'admin', op, code: S.cfg.code }, args || {}));
 };
 function demoOp(op, a) {
   const D = demoAdmin(); demoJournal();
@@ -600,7 +580,7 @@ M.buildDemo = (myDepot, buyer) => {
 };
 M.startDemo = async (depot, buyer) => {
   const d = M.buildDemo(depot, buyer);
-  S.data = d; S.queue = []; S.rejected = []; S.adm = null; S.demoAdm = null;
+  S.data = d; S.queue = []; S.rejected = []; S.demoAdm = null;
   S.cfg = { mode: 'demo', me: { depot, role: 'admin', nom: 'Démo' }, buyer: buyer || 'Moi', theme: (S.cfg && S.cfg.theme) || 'auto', depot };
   M.saveCfg(); await M.saveData(); await M.saveQueue(); M.reindex();
 };
@@ -616,7 +596,7 @@ M.connect = async (apiUrl, code, buyer) => {
   if (gen !== connectGen) { const e = new Error('Une autre connexion a été lancée entre-temps.'); e.superseded = true; throw e; }
   const keep = { cfg: S.cfg, data: S.data, queue: S.queue, rejected: S.rejected };
   try {
-    S.adm = null; S.cfg = nc; S.data = { prix: [], produits: [], fournisseurs: [], volumes: [], params: M.defaultParams(), acces: [] }; S.queue = []; S.rejected = [];
+    S.cfg = nc; S.data = { prix: [], produits: [], fournisseurs: [], volumes: [], params: M.defaultParams(), acces: [] }; S.queue = []; S.rejected = [];
     mergePull(j, true); nc.lastSync = j.now; nc.me = j.me;
     M.saveCfg(); await M.saveData(); await M.saveQueue(); M.reindex();
     return j.me;
@@ -665,7 +645,7 @@ M.parseInvite = txt => {
 
 /* effacement de l'appareil (déconnexion, code désactivé par l'administrateur) */
 M.wipe = async why => { await M.reset(); if (why) M.lsSet('wiped', why); M.emit('route'); if (location.hash !== '#/bienvenue') location.hash = '#/bienvenue'; };
-M.reset = async () => { await M.kvClear(); S.cfg = null; S.adm = null; S.demoAdm = null; M.lsSet('cfg', null); M.lsSet('cart', []); M.lsSet('draft', null); S.data = { prix: [], produits: [], fournisseurs: [], volumes: [], params: M.defaultParams(), acces: [] }; S.queue = []; S.rejected = []; M.reindex(); };
+M.reset = async () => { await M.kvClear(); S.cfg = null; S.demoAdm = null; M.lsSet('cfg', null); M.lsSet('cart', []); M.lsSet('draft', null); S.data = { prix: [], produits: [], fournisseurs: [], volumes: [], params: M.defaultParams(), acces: [] }; S.queue = []; S.rejected = []; M.reindex(); };
 
 /* ------------------------------------------------------------ export CSV */
 M.csv = (rows, cols, heads) => {
