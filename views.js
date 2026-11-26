@@ -55,7 +55,7 @@
     root.innerHTML = `${banners(true)}
       <div class="hello"><div><h1>${hi}${S.cfg.buyer ? ' ' + esc(S.cfg.buyer) : ''}</h1>
         <p class="muted" style="margin-top:6px">${M.depFull(dep)} <span class="faint">${esc(M.DEPCITY[dep])}</span>, ${esc(new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }))}</p></div>
-        ${M.canWrite() ? `<a class="btn primary big" href="#/saisir">${I.plus}Saisir un prix</a>` : ''}</div>
+        <a class="btn primary big" href="#/saisir">${I.plus}Saisir un prix</a></div>
       ${window.__mercDemoFile && !M.lsGet('tourDone', false) ? tourH() : ''}
       <div class="section"><div class="sh"><h2>Prix saisis cette semaine</h2><a href="#/saisies">Historique</a></div>
         <div class="statgrid">${M.DEPS.map(d => `<div class="stat c-${d}"><div class="v">${week[d]}</div><div class="l">${M.dep(d)} ${d === dep ? '<span class="faint">(toi)</span>' : ''}</div><div class="bar"><i style="width:${Math.round(week[d] / maxW * 100)}%;background:var(--c)"></i></div></div>`).join('')}</div></div>
@@ -73,7 +73,7 @@
       </div>
       <div class="section"><div class="sh"><h2>Derniers prix saisis</h2><a href="#/comparer">Comparer</a></div>
         <div class="panel flush">${feed.length ? feed.map(r => { const rf = M.rowRef(r); return `<a class="li" href="#/produit/${encodeURIComponent(r.produit_id)}">${M.dep(r.depot)}<div class="main"><div class="t">${esc(r.produit)}</div><div class="s">${esc(r.fournisseur || 'Fournisseur non précisé')}${r.origine ? ', ' + esc(r.origine) : ''}, ${esc(M.ago(r.date))}</div></div><div class="r">${rf ? M.priceV(rf.v, rf.u) : ''}</div></a>`; }).join('')
-          : `<div class="empty"><h2 class="h3">Aucun prix pour l’instant</h2><p>Commence par saisir le prix d’un produit acheté aujourd’hui.</p>${M.canWrite() ? '<a class="btn primary" href="#/saisir">Saisir un prix</a>' : ''}</div>`}</div></div>`;
+          : `<div class="empty"><h2 class="h3">Aucun prix pour l’instant</h2><p>Commence par saisir le prix d’un produit acheté aujourd’hui.</p>${true ? '<a class="btn primary" href="#/saisir">Saisir un prix</a>' : ''}</div>`}</div></div>`;
   };
 
   function tourH() {
@@ -108,9 +108,11 @@
   /* ============================================================ SAISIR */
   V.saisir = (root, q) => {
     if (!M.canWrite()) {
-      root.innerHTML = M.isAdmin() ? `<div class="empty"><h2 class="h3">Mode administrateur verrouillé</h2><p>Ton code administrateur n’est rattaché à aucun dépôt : déverrouille le mode administrateur pour saisir un prix.</p><button class="btn primary" type="button" id="unl">${I.edit}Déverrouiller</button></div>`
-        : `<div class="empty"><h2 class="h3">Lecture seule</h2><p>Ton code d’accès permet de consulter les prix, pas d’en saisir.</p></div>`;
-      const u = $('#unl', root); if (u) u.onclick = () => M.unlockSheet(() => M.emit('route')); return;
+      root.innerHTML = M.isAdmin() ? `<div class="empty"><h2 class="h3">Mode administrateur verrouillé</h2><p>Ton accès administrateur n’est rattaché à aucun dépôt : entre ton mot de passe pour saisir un prix.</p><button class="btn primary" type="button" id="unl">${I.edit}Déverrouiller</button></div>`
+        : `<div class="empty"><h2 class="h3">Accès en lecture seule</h2><p>Tu peux consulter tous les prix, mais ton accès ne permet pas d’en saisir. Pour saisir, demande à l’administrateur un accès Acheteur pour ton dépôt.</p><a class="btn" href="#/comparer">Comparer les prix</a></div>`;
+      const u = $('#unl', root);
+      if (u) { u.onclick = () => M.unlockSheet(() => M.emit('route')); if (!document.querySelector('.sheet-bg')) M.unlockSheet(() => M.emit('route')); }
+      return;
     }
     const edit = q.id ? S.data.prix.find(r => r.id === q.id) : null;
     if (q.id && !edit) { root.innerHTML = `<div class="empty"><h2 class="h3">Prix introuvable</h2><a class="btn" href="#/saisies">Retour à l’historique</a></div>`; return; }
@@ -408,7 +410,7 @@
     root.innerHTML = `${banners()}
       <a class="linkbtn" href="#/comparer" style="display:inline-flex;align-items:center;gap:4px;margin-bottom:10px">${I.back.replace('class="i"', 'class="i s"')}Comparer</a>
       <div class="prod-hero"><div><h1>${esc(p.nom)}</h1><p class="sub muted" style="margin-top:6px">${esc([p.famille, p.categorie].filter(Boolean).join(', ') || 'Produit')}</p>
-          <div class="row wrap" style="margin-top:12px">${M.canWrite() ? `<a class="btn primary" href="#/saisir?p=${encodeURIComponent(p.id)}">${I.plus}Saisir un prix</a>` : ''}
+          <div class="row wrap" style="margin-top:12px"><a class="btn primary" href="#/saisir?p=${encodeURIComponent(p.id)}">${I.plus}Saisir un prix</a>
           <button class="btn" type="button" id="fav" aria-pressed="${isFav}">${I.star}${isFav ? 'Dans mes favoris' : 'Ajouter aux favoris'}</button>
           ${M.isAdmin() ? `<button class="btn" type="button" id="pal">${I.truck}Palettisation</button>` : ''}</div></div>
         ${c ? `<div style="text-align:right"><p class="small muted" style="margin-bottom:6px">Meilleur prix récent, ${M.depFull(c.best)}</p>${M.priceTag(c.per[c.best].v, c.basis, 'xl')}</div>` : ''}</div>
